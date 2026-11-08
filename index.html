@@ -1,516 +1,290 @@
-/* =====================================================================
-   HERO — scroll-driven frame sequence + left/right skill words
-   ===================================================================== */
-(function () {
-  const HERO_FRAME_COUNT = 95;
-  const HERO_FRAME_PATH = (i) => `frames/frame_${String(i).padStart(3, "0")}.webp`;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ajit Bisen — Web Developer &amp; AI Agent Builder</title>
+<meta name="description" content="Ajit Kumar Bisen — WordPress & Shopify developer, SEO, AEO, GEO, Google Business Profile, UI/UX and AI automation specialist from Bhopal.">
+<meta name="theme-color" content="#07080c">
 
-  const canvas  = document.getElementById("heroCanvas");
-  const ctx     = canvas.getContext("2d");
-  const loader  = document.getElementById("heroLoader");
-  const poster  = document.getElementById("heroPoster");
-  const section = document.querySelector(".hero");
-  const intro   = document.getElementById("heroIntro");
-  const hint    = document.getElementById("heroScroll");
-  const bar     = document.getElementById("heroBar");
-  const words   = [...document.querySelectorAll(".word")].map((el) => ({
-    el,
-    start: parseFloat(el.dataset.start),
-    end: parseFloat(el.dataset.end),
-    left: el.classList.contains("word--left"),
-  }));
+<link rel="preload" as="image" href="frames/frame_000.webp" type="image/webp" fetchpriority="high">
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&display=swap">
+<link rel="stylesheet" href="style.css">
+<noscript><style>.nav,.hero__intro .eyebrow,.hero__intro h1,.hero__ticker,.hero__scroll,.hero__canvas{opacity:1!important}.hero__loader{display:none}</style></noscript>
+</head>
+<body>
 
-  const images = new Array(HERO_FRAME_COUNT);
-  let loadedCount = 0, currentFrame = 0, targetFrame = 0, rafId = null, painted = false;
-  let canvasW = 0, canvasH = 0;
+  <!-- Ambient colour blobs: give the glass something to blur -->
+  <div class="pagebar" id="pageBar" aria-hidden="true"></div>
+  <div class="ambient" aria-hidden="true">
+    <span class="blob blob--a"></span>
+    <span class="blob blob--b"></span>
+    <span class="blob blob--c"></span>
+  </div>
 
-  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
-  const easeOut = (t) => 1 - Math.pow(1 - t, 3);
-  const isMobile = () => window.innerWidth <= 760;
-  const fitScale = () => (isMobile() ? 1.55 : 0.72);
+  <!-- ============================================================
+       HEADER — compact floating glass pill
+  ============================================================= -->
+  <header class="header" id="header">
+    <nav class="nav glass" id="nav" aria-label="Main navigation">
+      <span class="nav__label">Menu</span>
 
-  function measureCanvas() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvasW = canvas.clientWidth;
-    canvasH = canvas.clientHeight;
-    if (!canvasW || !canvasH) return;
-    canvas.width = canvasW * dpr;
-    canvas.height = canvasH * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-  function resizeCanvas() {
-    measureCanvas();
-    drawFrame(currentFrame, true);
-  }
+      <ul class="nav__list" id="navList">
+        <li><a href="#home" class="nav__link is-active">Home</a></li>
+        <li><a href="#about" class="nav__link">About</a></li>
+        <li><a href="#projects" class="nav__link">Projects</a></li>
+        <li><a href="#skills" class="nav__link">Skills</a></li>
+        <li><a href="#experience" class="nav__link">Experience</a></li>
+        <li><a href="#contact" class="nav__link nav__link--cta">Contact Us</a></li>
+      </ul>
 
-  const isReady = (im) => im && im.complete && im.naturalWidth > 0;
-  // nearest frame that has actually loaded (so the hero is never blank while others stream in)
-  function bestAvailable(index) {
-    for (let d = 0; d < HERO_FRAME_COUNT; d++) {
-      if (isReady(images[index - d])) return images[index - d];
-      if (isReady(images[index + d])) return images[index + d];
-    }
-    return null;
-  }
+      <button class="nav__toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navList">
+        <span></span><span></span>
+      </button>
+    </nav>
+  </header>
 
-  function drawFrame(index, force) {
-    index = clamp(Math.round(index), 0, HERO_FRAME_COUNT - 1);
-    if (!force && index === currentFrame) return;
-    if (!canvasW || !canvasH) { measureCanvas(); if (!canvasW || !canvasH) return; }   // layout not ready yet -> retry later
-    const img = bestAvailable(index);
-    if (!img) return;
-    currentFrame = index;
-    const scale = Math.min(canvasW / img.naturalWidth, canvasH / img.naturalHeight) * fitScale();
-    const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
-    const dx = (canvasW - dw) / 2, dy = (canvasH - dh) / 2 - canvasH * (isMobile() ? 0.05 : 0.07);
-    ctx.clearRect(0, 0, canvasW, canvasH);
-    ctx.drawImage(img, dx, dy, dw, dh);
+  <!-- ============================================================
+       HERO — scroll-driven frames + words on left/right
+  ============================================================= -->
+  <section class="hero" id="home">
+    <div class="hero__sticky">
+      <!-- plain <img> shown instantly by the browser itself (no JS needed); the canvas takes over once ready -->
+      <img class="hero__poster" id="heroPoster" src="frames/frame_000.webp" alt="Ajit Bisen" width="960" height="540" fetchpriority="high" decoding="async"
+           onerror="var n=(+this.dataset.n||0)+1;if(n<12){this.dataset.n=n;this.src='frames/frame_'+String(n).padStart(3,'0')+'.webp'}">
+      <canvas class="hero__canvas" id="heroCanvas"></canvas>
 
-    // melt the hard bottom edge (neck / shoulders) into the background
-    const fh = dh * 0.3;
-    const g = ctx.createLinearGradient(0, dy + dh - fh, 0, dy + dh);
-    g.addColorStop(0, "rgba(0,0,0,0)");
-    g.addColorStop(1, "rgba(0,0,0,1)");
-    ctx.save();
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.fillStyle = g;
-    ctx.fillRect(dx - 2, dy + dh - fh, dw + 4, fh + 2);
-    ctx.restore();
+      <div class="hero__intro" id="heroIntro">
+        <p class="eyebrow">Hello, I’m</p>
+        <h1>Ajit Bisen</h1>
+      </div>
 
-    // canvas has really painted -> retire the plain <img> poster (they are pixel-aligned, so no jump)
-    if (poster && dw > 1 && dh > 1) poster.classList.add("is-off");
-    if (dw > 1 && dh > 1) painted = true;
-  }
-
-  function getProgress() {
-    const total = section.offsetHeight - window.innerHeight;
-    if (total <= 0) return 0;
-    return clamp(-section.getBoundingClientRect().top / total);
-  }
-
-  // Words fade/slide in from the outside edge, hold, then drift away.
-  function updateWords(p) {
-    const mobile = isMobile();
-    words.forEach((w) => {
-      const span = w.end - w.start;
-      const t = (p - w.start) / span;
-      let o = 0, shift = 0;
-      if (t > 0 && t < 1) {
-        const fadeIn = easeOut(clamp(t / 0.25));
-        const fadeOut = easeOut(clamp((1 - t) / 0.25));
-        o = Math.min(fadeIn, fadeOut);
-        const travel = t < 0.5 ? 1 - fadeIn : -(1 - fadeOut);   // -1..1 offset
-        shift = travel * 70;
-      }
-      const dir = w.left ? -1 : 1;
-      const dx = dir * shift * (mobile ? 0.55 : 1);
-      const dy = 0;
-      w.el.style.opacity = o.toFixed(3);
-      w.el.style.transform = `translate(${dx}px, calc(-50% + ${dy}px)) scale(${(0.94 + 0.06 * o).toFixed(3)})`;
-    });
-  }
-
-  function onScroll() {
-    const p = getProgress();
-    targetFrame = p * (HERO_FRAME_COUNT - 1);
-    updateWords(p);
-    bar.style.transform = `scaleY(${p})`;
-
-    const fade = clamp(1 - p / 0.06);
-    intro.style.opacity = fade;
-    intro.style.transform = `translateY(${(1 - fade) * 24}px)`;
-    hint.style.opacity = fade;
-
-    requestTick();
-  }
-
-  function tick() {
-    const diff = targetFrame - currentFrame;
-    if (Math.abs(diff) > 0.05) {
-      drawFrame(currentFrame + diff * 0.25, false);
-      rafId = requestAnimationFrame(tick);
-    } else {
-      drawFrame(targetFrame, false);
-      rafId = null;
-    }
-  }
-  function requestTick() { if (rafId === null) rafId = requestAnimationFrame(tick); }
-
-  let shown = false;
-  function showHero() {                       // reveal the page as soon as the FIRST frame is ready
-    if (shown) return;
-    shown = true;
-    loader.classList.add("is-hidden");
-    document.body.classList.add("is-ready");
-  }
-
-  function loadFrame(i) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.decoding = "async";
-      img.onload = img.onerror = () => {
-        loadedCount++;
-        if (i === 0) showHero();
-        // Paint as soon as ANYTHING usable has arrived (even if frame 0 itself is missing/404),
-        // and swap in the exact frame once it shows up. Never wait for a scroll or the page "load" event.
-        if (!painted || Math.round(targetFrame) === i) drawFrame(Math.round(targetFrame), true);
-        resolve();
-      };
-      img.src = HERO_FRAME_PATH(i);
-      images[i] = img;
-    });
-  }
-
-  async function preload() {
-    await loadFrame(0);                       // 1) first image — nothing else competes with it
-    showHero();
-    let next = 1;                             // 2) the rest, in scroll order, a few at a time
-    const worker = async () => { while (next < HERO_FRAME_COUNT) await loadFrame(next++); };
-    await Promise.all(Array.from({ length: 6 }, worker));
-  }
-
-  window.addEventListener("resize", () => { resizeCanvas(); onScroll(); });
-  window.addEventListener("load", () => { resizeCanvas(); onScroll(); });
-  if ("ResizeObserver" in window) new ResizeObserver(() => { resizeCanvas(); }).observe(canvas);   // phones: size can change after first paint
-  window.addEventListener("scroll", onScroll, { passive: true });
-  setTimeout(showHero, 2500);                 // safety net: reveal the page even on a very slow connection
-  resizeCanvas();
-  preload();
-  onScroll();
-})();
-
-/* =====================================================================
-   HEADER — mobile menu, scrolled state, scrollspy
-   ===================================================================== */
-(function () {
-  const header = document.getElementById("header");
-  const toggle = document.getElementById("navToggle");
-  const list   = document.getElementById("navList");
-  const links  = [...document.querySelectorAll(".nav__link")];
-  const sections = [...document.querySelectorAll("section[id]")];
-
-  function closeMenu() {
-    list.classList.remove("is-open");
-    toggle.classList.remove("is-active");
-    toggle.setAttribute("aria-expanded", "false");
-  }
-
-  toggle.addEventListener("click", () => {
-    const open = list.classList.toggle("is-open");
-    toggle.classList.toggle("is-active", open);
-    toggle.setAttribute("aria-expanded", String(open));
-  });
-  links.forEach((l) => l.addEventListener("click", closeMenu));
-  document.addEventListener("click", (e) => {
-    if (!header.contains(e.target)) closeMenu();
-  });
-
-  function spy() {
-    header.classList.toggle("is-scrolled", window.scrollY > 30);
-    const mid = window.scrollY + window.innerHeight * 0.35;
-    let current = sections[0].id;
-    sections.forEach((s) => { if (mid >= s.offsetTop) current = s.id; });
-    links.forEach((l) => l.classList.toggle("is-active", l.getAttribute("href") === `#${current}`));
-  }
-  window.addEventListener("scroll", spy, { passive: true });
-  spy();
-})();
-
-/* =====================================================================
-   SCROLL REVEAL
-   ===================================================================== */
-(function () {
-  const items = document.querySelectorAll(".reveal");
-  if (!("IntersectionObserver" in window)) { items.forEach((i) => i.classList.add("is-in")); return; }
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach((e) => {
-      if (e.isIntersecting) {
-        // small stagger for siblings
-        const idx = [...e.target.parentElement.children].indexOf(e.target);
-        e.target.style.transitionDelay = `${Math.min(idx, 5) * 90}ms`;
-        e.target.classList.add("is-in");
-        io.unobserve(e.target);
-      }
-    });
-  }, { threshold: 0.1, rootMargin: "0px 0px -6% 0px" });
-  items.forEach((i) => io.observe(i));
-})();
-
-/* =====================================================================
-   RUNNING TYPE — marquees driven by time + scroll velocity
-   ===================================================================== */
-(function () {
-  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const items = [...document.querySelectorAll(".marquee")].map((el) => {
-    const track = el.querySelector(".marquee__track");
-    const base = track.innerHTML;
-    track.innerHTML = base + base;
-    while (track.scrollWidth < window.innerWidth * 2.2) track.innerHTML += base;
-    return {
-      track, base, baseCount: (() => { const t = document.createElement('div'); t.innerHTML = base; return t.children.length; })(),
-      dir: parseFloat(el.dataset.dir || -1),
-      speed: parseFloat(el.dataset.speed || 0.5),
-      off: 0,
-    };
-  });
-  let lastY = window.scrollY, vel = 0;
-
-  function loop() {
-    const y = window.scrollY;
-    vel += ((y - lastY) - vel) * 0.12;
-    lastY = y;
-    items.forEach((m) => {
-      const sets = m.track.children.length / m.baseCount;
-      const setW = m.track.scrollWidth / sets;
-      m.off += m.dir * (reduce ? 0 : m.speed + Math.abs(vel) * 0.35);
-      // scrolling down speeds it up, scrolling up reverses it
-      if (vel < 0 && !reduce) m.off -= m.dir * Math.abs(vel) * 0.7;
-      while (m.off <= -setW) m.off += setW;
-      while (m.off > 0) m.off -= setW;
-      m.track.style.transform = `translate3d(${m.off}px,0,0)`;
-    });
-    requestAnimationFrame(loop);
-  }
-  requestAnimationFrame(loop);
-})();
-
-/* =====================================================================
-   HEADING WORD-BY-WORD REVEAL + COUNTERS
-   ===================================================================== */
-(function () {
-  document.querySelectorAll("[data-split]").forEach((h) => {
-    let i = 0;
-    const walk = (node) => {
-      [...node.childNodes].forEach((n) => {
-        if (n.nodeType === 3) {
-          const frag = document.createDocumentFragment();
-          n.textContent.split(/(\s+)/).forEach((p) => {
-            if (!p) return;
-            if (/^\s+$/.test(p)) { frag.appendChild(document.createTextNode(" ")); return; }
-            const w = document.createElement("span"); w.className = "w";
-            const s = document.createElement("span"); s.textContent = p; s.style.setProperty("--i", i++);
-            w.appendChild(s); frag.appendChild(w);
-          });
-          n.replaceWith(frag);
-        } else if (n.nodeType === 1 && n.tagName !== "BR") walk(n);
-      });
-    };
-    walk(h);
-  });
-
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach((e) => {
-      if (!e.isIntersecting) return;
-      e.target.classList.add("is-in");
-      io.unobserve(e.target);
-    });
-  }, { threshold: 0.3 });
-  document.querySelectorAll("[data-split]").forEach((h) => io.observe(h));
-
-  const cio = new IntersectionObserver((entries) => {
-    entries.forEach((e) => {
-      if (!e.isIntersecting) return;
-      const el = e.target, end = parseFloat(el.dataset.count), t0 = performance.now(), dur = 1600;
-      const step = (t) => {
-        const p = Math.min(1, (t - t0) / dur);
-        el.textContent = Math.round(end * (1 - Math.pow(1 - p, 4)));
-        if (p < 1) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-      cio.unobserve(el);
-    });
-  }, { threshold: 0.6 });
-  document.querySelectorAll("[data-count]").forEach((c) => cio.observe(c));
-})();
-
-/* =====================================================================
-   PROJECTS — data-driven cards + category filter
-   ===================================================================== */
-(function () {
-  const grid = document.getElementById("projectGrid");
-  const bar  = document.getElementById("filters");
-  if (!grid || !bar) return;
-
-  const P = (cat, title, url, sub) => ({ cat, title, url, sub });
-  const projects = [
-    P("Shopify", "Blumun", "https://blumun.in/"),
-    P("Shopify", "Hyskyn", "https://hyskyn.com/"),
-    P("Shopify", "Nepterra", "https://nepterra.com"),
-    P("Shopify", "Masakali", "https://masakali.co"),
-    P("Shopify", "Being Painfree", "https://being-painfree.com"),
-    P("Shopify", "Poshnaari", "https://poshnaari.com"),
-    P("Shopify", "Raw Era", "https://raw-era.com"),
-    P("Shopify", "White Rose", "https://whiteroseofficial.com"),
-
-    P("WordPress", "Parda Sansar", "https://pardasansar.in/"),
-    P("WordPress", "Tour Uncle", "https://touruncle.com/"),
-    P("WordPress", "Enorma Infraa", "https://enormainfraa.com/"),
-    P("WordPress", "Sudipta’s English Academy", "https://sudiptasenglishacademy.com/"),
-    P("WordPress", "Ram Mandir Piplani", "https://rammandirpiplani.org/"),
-    P("WordPress", "Chef Mohammad Husain", "https://chefmohammadhusain.com/"),
-    P("WordPress", "DSS Jewellers", "https://dssjewellers.in/"),
-    P("WordPress", "WheyFit", "https://wheyfit.co.in/"),
-    P("WordPress", "GI Sewa", "https://gisewa.org/"),
-    P("WordPress", "Lazeez Hakeem", "https://lazeezhakeem.com/"),
-
-    P("Wedding Invites", "Arnav weds Diya", "https://sadarnimantran.in/invite/arnav-diya", "Sample design"),
-    P("Wedding Invites", "Reyansh weds Myra", "https://sadarnimantran.in/invite/reyansh-myra", "Sample design"),
-    P("Wedding Invites", "Aarav weds Kiara", "https://sadarnimantran.in/invite/aarav-kiara", "Sample design"),
-    P("Wedding Invites", "Raghav weds Ishita", "https://sadarnimantran.in/invite/raghav-ishita", "Premium e-invite sample · ₹1,499"),
-
-    P("Custom Code", "Advertising360", "https://advertising360.in/"),
-    P("Custom Code", "Ankit Mathur", "http://ankitmathur.co.in/"),
-
-    P("CRM Tools", "Salary Slip CRM", "https://salaryslip.advertising360.in", "Advertising360 tool"),
-    P("CRM Tools", "Task Management CRM", "https://taskmanagementcrm.advertising360.in", "Advertising360 tool"),
-    P("CRM Tools", "Meta Lead CRM", "https://metaleadcrm.advertising360.in", "Advertising360 tool"),
-  ];
-  const cats = ["All", ...new Set(projects.map((p) => p.cat))];
-  const host = (u) => new URL(u).hostname.replace(/^www\./, "");
-  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-
-  bar.innerHTML = cats.map((c, i) => {
-    const n = c === "All" ? projects.length : projects.filter((p) => p.cat === c).length;
-    return `<button class="filter${i === 0 ? " is-active" : ""}" role="tab" data-cat="${c}">${c}<small>${n}</small></button>`;
-  }).join("");
-
-  function render(cat) {
-    const list = cat === "All" ? projects : projects.filter((p) => p.cat === cat);
-    grid.innerHTML = list.map((p, i) => {
-      const h = host(p.url);
-      const shot = `https://s.wordpress.com/mshots/v1/${encodeURIComponent(p.url)}?w=640&h=400`;
-      return `<a class="pcard glass" style="--i:${i}" href="${p.url}" target="_blank" rel="noopener">
-        <div class="pcard__shot" data-i="${esc(p.title[0])}">
-          <span class="pcard__cat">${p.cat}</span>
-          <img src="${shot}" alt="Preview of ${esc(p.title)}" loading="lazy" onerror="this.remove()">
+      <div class="hero__words" aria-hidden="false">
+        <div class="word word--left glass" data-start="0.06" data-end="0.30">
+          <span class="word__k">01</span>
+          <p>I’m a <strong>Web Developer</strong></p>
         </div>
-        <div>
-          <h3>${esc(p.title)}</h3>
-          <p>${p.sub ? esc(p.sub) + " · " : ""}${h}${p.url.includes("/invite/") ? "/" + p.url.split("/").pop() : ""}</p>
+        <div class="word word--right glass" data-start="0.28" data-end="0.52">
+          <span class="word__k">02</span>
+          <p>I build <strong>AI Agents</strong></p>
         </div>
-        <div class="pcard__go"><span>Visit site</span><b>→</b></div>
-      </a>`;
-    }).join("");
-  }
+        <div class="word word--left glass" data-start="0.50" data-end="0.74">
+          <span class="word__k">03</span>
+          <p>A <strong>Website Professional</strong></p>
+        </div>
+        <div class="word word--right glass" data-start="0.72" data-end="0.98">
+          <span class="word__k">04</span>
+          <p>Doing <strong>AI &amp; Automation</strong></p>
+        </div>
+      </div>
 
-  bar.addEventListener("click", (e) => {
-    const b = e.target.closest(".filter");
-    if (!b) return;
-    bar.querySelectorAll(".filter").forEach((x) => x.classList.toggle("is-active", x === b));
-    render(b.dataset.cat);
-  });
-  const pcount = document.getElementById("pcount"), pfill = document.getElementById("pfill");
-  function updateNav() {
-    const cards = grid.children, n = cards.length;
-    if (!n || !pcount) return;
-    const step = cards[0].offsetWidth + 12;
-    const max = grid.scrollWidth - grid.clientWidth;
-    const idx = max <= 0 ? 0 : Math.min(n - 1, Math.round(grid.scrollLeft / step));
-    pcount.textContent = `${idx + 1} / ${n}`;
-    pfill.style.transform = `scaleX(${max <= 0 ? 1 : Math.max(0.04, grid.scrollLeft / max)})`;
-  }
-  grid.addEventListener("scroll", updateNav, { passive: true });
-  window.addEventListener("resize", updateNav);
-  const _render = render;
-  render = function (cat) { _render(cat); grid.scrollLeft = 0; updateNav(); };
-  render("All");
-})();
+      <div class="marquee hero__ticker" data-dir="-1" data-speed="0.6" aria-hidden="true">
+        <div class="marquee__track"><span>Web Developer</span><i>✦</i><span class="o">AI Agents</span><i>✦</i><span>Automation</span><i>✦</i><span class="o">UI / UX</span><i>✦</i></div>
+      </div>
 
-/* =====================================================================
-   POLISH — page progress bar + cursor spotlight on glass cards
-   ===================================================================== */
-(function () {
-  const bar = document.getElementById("pageBar");
-  const upd = () => {
-    const max = document.documentElement.scrollHeight - window.innerHeight;
-    bar.style.transform = `scaleX(${max > 0 ? window.scrollY / max : 0})`;
-  };
-  window.addEventListener("scroll", upd, { passive: true });
-  upd();
+      <div class="hero__scroll" id="heroScroll"><i></i><span>Scroll</span></div>
+      <div class="hero__progress"><b id="heroBar"></b></div>
+      <div class="hero__loader" id="heroLoader">Loading…</div>
+    </div>
+  </section>
 
-  const SEL = ".card, .skill, .pcard, .tl, .step, .numbers, .contact";
-  document.addEventListener("pointermove", (e) => {
-    const el = e.target.closest && e.target.closest(SEL);
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    el.style.setProperty("--mx", `${e.clientX - r.left}px`);
-    el.style.setProperty("--my", `${e.clientY - r.top}px`);
-  });
-})();
+  <main>
+    <!-- ABOUT -->
+    <section class="section" id="about">
+      <div class="container">
+        <header class="section__head reveal">
+          <span class="tag">About</span>
+          <h2 data-split>Design-minded <em>developer,</em><br>automation-first <em>thinker.</em></h2>
+        </header>
+        <div class="bento">
+          <article class="card glass about reveal">
+            <p class="lead">I’m Ajit Kumar Bisen, a WordPress &amp; Shopify developer from Bhopal who also handles SEO (AEO, GEO &amp; Google Business Profile) and UI/UX.</p>
+            <p>I build fast, pixel-perfect websites that rank and convert — and AI agents with n8n that automate the rest.</p>
+            <ul class="meta">
+              <li>Bhopal, India</li>
+              <li>B.Tech CSE · RGPV</li>
+              <li>CGPA 8.0</li>
+            </ul>
+          </article>
+          <div class="tiles">
+            <div class="tile glass reveal">
+              <span class="tile__ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
+              <b><span data-count="6">0</span>+</b><strong>Years of experience</strong><small>Building since 2020</small>
+            </div>
+            <div class="tile glass reveal">
+              <span class="tile__ico"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5"/></svg></span>
+              <b><span data-count="500">0</span>+</b><strong>Projects delivered</strong><small>Sites, stores &amp; tools</small>
+            </div>
+            <div class="tile glass reveal">
+              <span class="tile__ico"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="3"/><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M3 13h18"/></svg></span>
+              <b><span data-count="30">0</span>+</b><strong>Sites at Advertising 360</strong><small>Since March 2024</small>
+            </div>
+            <div class="tile glass reveal">
+              <span class="tile__ico"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg></span>
+              <b>₹<span data-count="1">0</span>L+</b><strong>Own-store sales</strong><small>Via SEO &amp; UI/UX</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-/* =====================================================================
-   SCROLL-LINKED CARD MOTION
-   Columns drift in opposite directions (two up, one down), timeline and
-   About cards slide in from the sides — all scrubbed by scroll position.
-   Uses the CSS `translate` property so it never fights reveal/hover.
-   ===================================================================== */
-(function () {
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    <!-- PROJECTS -->
+    <section class="section" id="projects">
+      <div class="container">
+        <header class="section__head reveal">
+          <span class="tag">Projects</span>
+          <h2 data-split>Selected <em>work.</em></h2>
+          <p class="section__sub">Stores, websites, invitations and tools — built and live.</p>
+        </header>
+        <div class="filters glass reveal" id="filters" role="tablist" aria-label="Project categories"></div>
+        <div class="projects" id="projectGrid"></div>
+        <div class="pnav" id="pnav" aria-hidden="true"><span id="pcount">1 / 27</span><i class="pbar"><b id="pfill"></b></i><span class="pswipe">Swipe →</span></div>
+      </div>
+    </section>
 
-  // [selector, mode, amount]   mode: "col3" | "col2" | "alt" | "left" | "right" | "side"
-  const RULES = [
-    ["#skills .skill",       "col3",  0.08, 26],
-    [".projects .pcard",     "col3",  0.04, 12],
-    [".steps .step",         "alt",   0.06, 18],
-    [".tiles .tile",         "col2",  0.06, 16],
-    [".about",               "left",  60],
-    [".tl",                  "side",  60],
-    [".duo .card",           "side",  60],
-  ];
-  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-  const state = new WeakMap();
-  let raf = null;
+    <!-- SKILLS -->
+    <section class="section" id="skills">
+      <div class="container">
+        <header class="section__head reveal">
+          <span class="tag">Skills</span>
+          <h2 data-split>What I do <em>best.</em></h2>
+        </header>
+        <div class="grid grid--3">
+          <div class="skill glass reveal"><i>⌘</i><h3>CMS &amp; E‑commerce</h3><p>WordPress, Shopify, WooCommerce, custom themes.</p></div>
+          <div class="skill glass reveal"><i>↗</i><h3>Traditional SEO</h3><p>Technical, on-page and off-page SEO.</p></div>
+          <div class="skill glass reveal"><i>❖</i><h3>AEO &amp; GEO</h3><p>Answer &amp; Generative Engine Optimization for AI search.</p></div>
+          <div class="skill glass reveal"><i>⌖</i><h3>Google Business Profile</h3><p>Local SEO, listings, reviews and map ranking.</p></div>
+          <div class="skill glass reveal"><i>◐</i><h3>UI / UX</h3><p>Elementor, pixel-perfect and mobile-first layouts.</p></div>
+          <div class="skill glass reveal"><i>◎</i><h3>Speed &amp; CRO</h3><p>Core Web Vitals and conversion optimization.</p></div>
+          <div class="skill glass reveal"><i>▤</i><h3>Web Tech</h3><p>HTML5, CSS3, JavaScript, PHP, React.js, cPanel, APIs.</p></div>
+          <div class="skill glass reveal"><i>✦</i><h3>AI &amp; Automation</h3><p>ChatGPT, DeepSeek, Claude, n8n AI agents.</p></div>
+          <div class="skill glass reveal"><i>⚡</i><h3>Productivity</h3><p>Canva AI, Copilot, MS Office.</p></div>
+        </div>
+      </div>
+      <p class="trust__label">Tools &amp; platforms I work with</p>
+      <div class="marquee marquee--chips" data-dir="-1" data-speed="0.45" aria-hidden="true">
+        <div class="marquee__track"><span class="tool"><i class="tool__logo"><img src="logos/wordpress.svg" alt="" width="24" height="24"></i>WordPress</span><span class="tool"><i class="tool__logo"><img src="logos/shopify.svg" alt="" width="24" height="24"></i>Shopify</span><span class="tool"><i class="tool__logo"><img src="logos/woocommerce.svg" alt="" width="24" height="24"></i>WooCommerce</span><span class="tool"><i class="tool__logo"><img src="logos/elementor.svg" alt="" width="24" height="24"></i>Elementor</span><span class="tool"><i class="tool__logo"><img src="logos/react.svg" alt="" width="24" height="24"></i>React.js</span><span class="tool"><i class="tool__logo"><img src="logos/javascript.svg" alt="" width="24" height="24"></i>JavaScript</span><span class="tool"><i class="tool__logo"><img src="logos/php.svg" alt="" width="24" height="24"></i>PHP</span><span class="tool"><i class="tool__logo"><img src="logos/n8n.svg" alt="" width="24" height="24"></i>n8n</span><span class="tool"><i class="tool__logo"><img src="logos/shiprocket.png" alt="" width="24" height="24"></i>Shiprocket</span><span class="tool"><i class="tool__logo"><img src="logos/googlemaps.svg" alt="" width="24" height="24"></i>Google Business Profile</span><span class="tool"><i class="tool__logo"><img src="logos/openai.svg" alt="" width="24" height="24"></i>ChatGPT</span><span class="tool"><i class="tool__logo"><img src="logos/claude.svg" alt="" width="24" height="24"></i>Claude</span><span class="tool"><i class="tool__logo"><img src="logos/deepseek.svg" alt="" width="24" height="24"></i>DeepSeek</span><span class="tool"><i class="tool__logo"><img src="logos/cpanel.svg" alt="" width="24" height="24"></i>cPanel</span></div>
+      </div>
+    </section>
 
-  function targetFor(el, mode, amt, vh, max) {
-    const s = state.get(el) || { x: 0, y: 0 };
-    const r = el.getBoundingClientRect();
-    const cx = r.left + r.width / 2 - s.x;           // remove our own offset
-    const cy = r.top + r.height / 2 - s.y;
-    const idx = [...el.parentElement.children].indexOf(el);
-    // grid modes: the WHOLE column moves together (reference = the grid, not the card),
-    // so cards in a column never squeeze into each other
-    const pr = el.parentElement.getBoundingClientRect();
-    const d = clamp((mode === "side" || mode === "left" ? cy : pr.top + pr.height / 2) - vh / 2, -500, 500);
-    let tx = 0, ty = 0;
-    if (mode === "col3") ty = d * amt * ([-1, 1, -1][idx % 3]);
-    else if (mode === "col2") ty = d * amt * ([-1, 1][idx % 2]);
-    else if (mode === "alt") ty = d * amt * (idx % 2 ? 1 : -1);
-    else {
-      // slide in from the side while the card travels from the bottom edge to centre
-      const p = clamp((cy - vh * 0.64) / (vh * 0.36), 0, 1);  // 1 = just entering, 0 = settled
-      const dir = mode === "left" ? -1 : (idx % 2 ? 1 : -1);
-      tx = dir * amt * p;
-    }
-    if (max) ty = clamp(ty, -max, max);   // never drift far enough to touch headings / filters / neighbours
-    return { tx, ty };
-  }
+    <!-- PROCESS -->
+    <section class="section section--tight">
+      <div class="container">
+        <header class="section__head reveal">
+          <span class="tag">Process</span>
+          <h2 data-split>How I <em>work.</em></h2>
+        </header>
+        <div class="steps">
+          <div class="step glass reveal"><b>01</b><h3>Discover</h3><p>Goals, audience and competitors.</p></div>
+          <div class="step glass reveal"><b>02</b><h3>Design</h3><p>Clean UI/UX, mobile-first.</p></div>
+          <div class="step glass reveal"><b>03</b><h3>Build</h3><p>WordPress, Shopify or custom code — fast and SEO-ready.</p></div>
+          <div class="step glass reveal"><b>04</b><h3>Grow</h3><p>SEO, AEO/GEO, GBP and automation.</p></div>
+        </div>
+      </div>
+    </section>
 
-  function frame() {
-    raf = null;
-    const vh = window.innerHeight;
-    let busy = false;
-    const mobile = window.innerWidth <= 760;
-    RULES.forEach(([sel, mode, amt, max]) => {
-      document.querySelectorAll(sel).forEach((el) => {
-        let s = state.get(el);
-        if (!s) { s = { x: 0, y: 0 }; state.set(el, s); }
-        if (mobile) { if (s.x || s.y) { s.x = s.y = 0; el.style.translate = "none"; } return; }
-        // skip only when the whole group is far off-screen, so every card in a
-        // column always updates together (never drifts out of sync with its neighbours)
-        const r = (mode === "side" || mode === "left" ? el : el.parentElement).getBoundingClientRect();
-        if (r.bottom < -300 || r.top > vh + 300) return;
-        const t = targetFor(el, mode, amt, vh, max);
-        s.x += (t.tx - s.x) * 0.14;
-        s.y += (t.ty - s.y) * 0.14;
-        if (Math.abs(t.tx - s.x) > 0.1 || Math.abs(t.ty - s.y) > 0.1) busy = true;
-        el.style.translate = `${s.x.toFixed(2)}px ${s.y.toFixed(2)}px`;
-        el.style.setProperty("--tx", `${s.x.toFixed(2)}px`);
-      });
-    });
-    if (busy) raf = requestAnimationFrame(frame);
-  }
-  const kick = () => { if (raf === null) raf = requestAnimationFrame(frame); };
-  window.addEventListener("scroll", kick, { passive: true });
-  window.addEventListener("resize", kick);
-  kick();
-})();
+    <!-- EXPERIENCE -->
+    <section class="section" id="experience">
+      <div class="container container--narrow">
+        <header class="section__head reveal">
+          <span class="tag">Experience</span>
+          <h2 data-split>The journey <em>so far.</em></h2>
+        </header>
+        <div class="timeline">
+          <article class="tl glass reveal">
+            <span class="tl__date">Mar 2024 — Present · Bhopal</span>
+            <h3>Web Developer &amp; E-commerce Lead</h3>
+            <span class="tl__co">Advertising 360</span>
+            <p>Built and scaled 30+ WordPress &amp; Shopify sites. Lead SEO, AEO/GEO and Shiprocket/API integrations.</p>
+          </article>
+          <article class="tl glass reveal">
+            <span class="tl__date">Jan 2020 — Feb 2024 · Hybrid</span>
+            <h3>WordPress / Shopify Developer &amp; Marketer</h3>
+            <span class="tl__co">Freelance / E-commerce Store</span>
+            <p>Delivered 500+ responsive projects. Grew my own store to ₹1 Lakh+ in sales with SEO and sharp UI/UX.</p>
+          </article>
+          <article class="tl glass reveal">
+            <span class="tl__date">May — Sep 2023 · Jaipur</span>
+            <h3>React.js Developer</h3>
+            <span class="tl__co">Celebal Technologies</span>
+            <p>Built React interfaces and API integrations for headless CMS setups.</p>
+          </article>
+        </div>
+
+        <div class="duo">
+          <article class="card glass reveal">
+            <h3>Education</h3>
+            <ul class="mini">
+              <li><b>B.Tech, Computer Science</b><span>RGPV · CGPA 8.0 · 2020–24</span></li>
+            </ul>
+          </article>
+          <article class="card glass reveal">
+            <h3>Achievements</h3>
+            <ul class="mini">
+              <li><b>MP Govt. Protsahan Yojna</b><span>₹25,000 award</span></li>
+              <li><b>Code Hunt</b><span>1st prize · Amity Univ.</span></li>
+              <li><b>Break-the-code</b><span>2nd prize · LNCT Bhopal</span></li>
+              <li><b>1st rank</b><span>10th &amp; 12th · School President</span></li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACT -->
+    <section class="section" id="contact">
+      <div class="container container--narrow">
+        <div class="contact glass reveal">
+          <span class="avail"><i></i>Available for new projects</span>
+          <span class="tag">Contact Us</span>
+          <h2 data-split>Let’s build something<br><em>remarkable</em> together.</h2>
+          <p>Have a project or an idea? Drop a message — I reply fast.</p>
+          <div class="contact__actions">
+            <a href="mailto:ajitbisen140@gmail.com" class="btn">ajitbisen140@gmail.com <span>→</span></a>
+            <a href="tel:+919399170290" class="btn btn--ghost">+91 93991 70290</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================================================
+       FOOTER
+  ============================================================= -->
+  <footer class="footer">
+    <div class="footer__glow" aria-hidden="true"></div>
+
+    <div class="container footer__inner">
+      <p class="footer__kicker">Let’s connect</p>
+
+      <div class="socials" aria-label="Social media">
+        <a class="soc glass" href="https://www.facebook.com/people/Ajit-Web-AI-Studio/61581953243268/" target="_blank" rel="noopener" aria-label="Facebook" style="--d:0s">
+          <svg viewBox="0 0 24 24"><path d="M13.5 21v-7.5h2.6l.4-3h-3V8.6c0-.9.3-1.5 1.5-1.5h1.6V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.9 1.4-3.9 4v2.2H7.8v3h2.6V21h3.1z"/></svg>
+        </a>
+        <a class="soc glass" href="https://www.instagram.com/ajit.web.ai/" target="_blank" rel="noopener" aria-label="Instagram" style="--d:.4s">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>
+        </a>
+        <a class="soc glass" href="https://www.linkedin.com/in/ajit-bisen-27a55a24b/" target="_blank" rel="noopener" aria-label="LinkedIn" style="--d:.8s">
+          <svg viewBox="0 0 24 24"><path d="M5.4 9.2h3V20h-3V9.2zM6.9 4.4a1.7 1.7 0 110 3.4 1.7 1.7 0 010-3.4zM10.4 9.2h2.9v1.5c.4-.8 1.4-1.7 3-1.7 3.2 0 3.8 2.1 3.8 4.8V20h-3v-5.5c0-1.3 0-3-1.8-3s-2.1 1.4-2.1 2.9V20h-3V9.2z"/></svg>
+        </a>
+        <a class="soc glass" href="https://github.com/ajitbisen123" target="_blank" rel="noopener" aria-label="GitHub" style="--d:1.6s">
+          <svg viewBox="0 0 24 24"><path d="M12 2.8a9.2 9.2 0 00-2.9 17.9c.5.1.6-.2.6-.4v-1.6c-2.6.6-3.1-1.2-3.1-1.2-.4-1.1-1-1.4-1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.8.8.1-.6.3-1.1.6-1.3-2.1-.2-4.2-1-4.2-4.6 0-1 .4-1.9 1-2.5-.1-.2-.4-1.2.1-2.5 0 0 .8-.3 2.6 1a8.900 8.900 0 014.700 0c1.800-1.200 2.600-1 2.600-1 .5 1.300.2 2.300.1 2.500.6.700 1 1.500 1 2.500 0 3.600-2.200 4.400-4.300 4.600.3.300.6.900.6 1.700v2.500c0 .2.1.5.6.4A9.200 9.200 0 0012 2.800z"/></svg>
+        </a>
+        <a class="soc glass" href="https://wa.me/919399170290" target="_blank" rel="noopener" aria-label="WhatsApp" style="--d:2.4s">
+          <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 00-7.700 13.600L3 21l4.500-1.200A9 9 0 1012 3zm0 1.700a7.300 7.300 0 11-3.900 13.500l-.3-.2-2.600.7.700-2.500-.2-.3A7.300 7.300 0 0112 4.700zm-2.700 3.600c-.2 0-.4 0-.6.300-.2.300-.8.800-.8 2s.9 2.300 1 2.500c.1.200 1.700 2.700 4.200 3.700 2 .8 2.500.7 2.900.6.500 0 1.400-.6 1.600-1.200.2-.6.200-1.100.1-1.200l-.5-.3-1.600-.8c-.2-.1-.4-.1-.6.100l-.8 1c-.1.200-.3.200-.5.100-.2-.1-1-.4-1.900-1.200-.7-.6-1.200-1.400-1.300-1.700-.1-.2 0-.4.100-.5l.4-.5.200-.4v-.4l-.8-1.900c-.2-.5-.4-.4-.6-.4z"/></svg>
+        </a>
+      </div>
+
+      <h2 class="footer__name" aria-label="Ajit Bisen">Ajit Bisen</h2>
+
+      <div class="footer__bar">
+        <span>© 2026 Ajit Bisen. All rights reserved.</span>
+        <a href="#home" class="footer__top">Back to top ↑</a>
+      </div>
+    </div>
+  </footer>
+
+<script src="script.js"></script>
+</body>
+</html>
